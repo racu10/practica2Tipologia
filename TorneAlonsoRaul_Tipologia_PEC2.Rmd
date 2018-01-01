@@ -1,0 +1,183 @@
+---
+title: 'Práctica 2: Limpieza y validación de los datos'
+author: "Raul Torne Alonso"
+date: "29 de diciembre de 2017"
+output: html_document
+---
+
+<style>
+  body {
+    text-align: justify
+  }
+</style>
+
+
+Dataset: https://www.kaggle.com/kendallgillies/video-game-sales-and-ratings
+
+### 1.Descripción del dataset. ¿Por qué es importante y qué pregunta/problema pretende responder?
+
+El dataset seleccionado contiene información sobre videojuegos. Para obtener dicha información, se han scrapeado las webs vgchartz y metacritic. Esto nos ha permitido conocer datos como el titulo específico del juego, la plataforma, el género al que pertenece, el año de publicación, entre otros. Al mismo tiempo, también se ha podido extraer las puntuaciones aportadas por los usuarios de metacritic, aunque cabe decir que no todos los videojuegos contienen dicha información, pues algunos no han sido valorados.
+
+Ahora bien, el motivo principal por el cual cabe tener presente la gran importancia de este dataset, es que puede ser una herramienta fundamental para las empresas desarrolladoras de videojuegos, pues aporta información sobre las tendencias actuales tanto a nivel de plataformas como en géneros. Pues es necesario tener presente, que en cada época se establecen diferentes modas capaces de influenciar todos los ámbitos, y entre ellos el mundo del ocio y los videojuegos. Así pues, estos datos ayudaran a las empresas reconocidas a mantener su estatus de éxito y a las nuevas a prosperar y evolucionar. Puesto que es imprescindible tener en cuenta, que nos encontramos frente a un mercado cada vez más competitivo debido a el número de nuevas empresas que están surgiendo en este sector. Por lo tanto, es necesario que tengan la posibilidad de realizar un análisis mediante estos datos, para así posteriormente crear contenido adaptado a las preferencias de los usuarios.
+
+En lo que concierne a que pregunta o problema pretende responder, considero que todos estos datos nos pueden responder a varias cuestiones. Por un lado, nos pueden mostrar 
+¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito en Europa? Pues como ya se ha mencionado anteriormente, dichos datos proporcionan información relevante respecto a cuál es el contenido que más éxito está teniendo y por lo tanto en cual han de seguir trabajando. Por otro lado, también puede responder a ¿El género con mayor rating es el que más ventas produce? Es decir, si los productos más vendidos son también los más valorados. Pues de este modo, ayudara a las empresas a deducir si las ventas están o no relacionadas con las puntuaciones y críticas de los usuarios. 
+
+
+```{r}
+videoGamesSales<-read.csv("Video_Game_Sales_as_of_Jan_2017.csv", header=TRUE, sep=",")
+videoGamesSales$Year_of_Release<- as.integer(as.character(videoGamesSales$Year_of_Release))
+
+
+summary(videoGamesSales)
+```
+
+
+### 2. Limpieza de los datos.
+#### 2.1 Selección de los datos de interés a analizar. ¿Cuáles son los campos más relevantes para responder al problema?
+
+Los campos más relevantes son "Genre",  "Year_of_Release", "**_Sales", "*_score"
+
+#### 2.2 ¿Los datos contienen ceros o elementos vacíos? ¿Y valores extremos? ¿Cómo gestionarías cada uno de estos casos?
+
+Los datos que contienen los scores contienen elementos vacios. Por ello mediante la distancia de Gower predecimos las puntuaciones por similitud de videojuegos permitiendo utilizar todos los datos para nuestra predicción.
+
+```{r}
+require(VIM)
+videoGamesSales <- kNN(videoGamesSales, k = 6)
+summary(videoGamesSales)
+```
+
+
+También tenemos valores extremos en las ventas, ya que siempre hay algún juego que destaca en ventas:
+
+```{r}
+boxplot(videoGamesSales$EU_Sales)
+boxplot(videoGamesSales$NA_Sales)
+boxplot(videoGamesSales$JP_Sales)
+
+```
+
+
+### 3. Análisis de los datos.
+  - A. Selección de los grupos de datos que se quieren analizar/comparar.
+  
+```{r}
+allYears <- sort(unique(videoGamesSales$Year_of_Release))
+allGenres <- unique(videoGamesSales$Genre)
+allPlatforms <- unique(videoGamesSales$Platform)
+
+```
+
+  
+  - B. Comprobación de la normalidad y homogeneidad de la varianza. Si es necesario (y posible), aplicar transformaciones que normalicen los datos.
+
+Las puntuaciones de los usuarios como las de metacritic estaran entre 0 y 1. 
+
+```{r}
+videoGamesSales$Critic_Score <- videoGamesSales$Critic_Score / 100
+videoGamesSales$User_Score <- videoGamesSales$User_Score / 10
+
+print(hist(videoGamesSales$Critic_Score, breaks = 100))
+print(hist(videoGamesSales$User_Score, breaks = 100))
+
+```
+
+  
+  - C. Aplicación de pruebas estadísticas (tantas como sea posible) para comparar los grupos de datos.
+  
+    - Vamos a comparar si las puntuaciones de metacritic son idénticas según el género con una significancia del 0.05.
+
+```{r}
+kruskal.test(Critic_Score ~ Genre, data = videoGamesSales)
+```
+Rechazamos la hipótesis nula de que son idénticas ya que el p-valor < 0.05, por lo que podemos decir que son poblaciones no idénticas.  
+  
+    - Vamos a comparar si las puntuaciones de los usuarios son idénticas según el género con una significancia del 0.05.
+
+```{r}
+kruskal.test(User_Score ~ Genre, data = videoGamesSales)
+```
+Rechazamos la hipótesis nula de que son idénticas ya que el p-valor < 0.05, por lo que podemos decir que son poblaciones no idénticas.  
+
+### 4. Representación de los resultados a partir de tablas y gráficas.
+
+
+```{r}
+library(ggplot2)
+library(scales)
+
+analyzeSales <- function(salesToAnalyze, years, mainTitle, ylabel){
+  mm <- matrix(0, nrow = length(allGenres), ncol = length(years))
+  colnames(mm) <- as.character(years)
+  rownames(mm) <- as.character(allGenres)
+  
+  for (gnr in allGenres)
+  {
+    data <- c()
+    for (y in years)
+    {
+      sales <- subset(salesToAnalyze, videoGamesSales$Genre == gnr & videoGamesSales$Year_of_Release == y)
+      
+      if (length(sales > 0)){
+        sales <- mean(sales)
+      }
+      else{
+        sales <- 0
+      }
+      
+      data <- append(data, sales)
+    }
+    mm[as.character(gnr),] <- data
+  }
+  {
+  barplot(as.matrix(mm), main=mainTitle, ylab = ylabel, xlab = "Years", cex.lab = 0.9, cex.main = 1.4, beside=TRUE, col=topo.colors(length(allGenres)), ylim = c(0.0, round(max(mm),1)))
+  legend("topright",  as.character(allGenres), cex=0.6, bty="n", fill=topo.colors(length(allGenres)))
+  }
+}
+
+
+```
+
+```{r}
+yrs <- allYears[allYears > 2009]
+
+analyzeSales(salesToAnalyze = videoGamesSales$NA_Sales, years = yrs, mainTitle ="Mean Million Sales in NA by Genre", ylabel = "Million Sales")
+
+```
+
+```{r}
+analyzeSales(salesToAnalyze = videoGamesSales$EU_Sales, years = yrs, mainTitle ="Mean Million Sales in EU by Genre", ylabel = "Million Sales")
+```
+
+```{r}
+analyzeSales(salesToAnalyze = videoGamesSales$JP_Sales, years = yrs, mainTitle ="Mean Million Sales in JP by Genre", ylabel = "Million Sales")
+```
+```{r}
+analyzeSales(salesToAnalyze = videoGamesSales$User_Score, years = yrs, mainTitle ="Mean user ratings by Genre", ylabel = "Ratings")
+```
+```{r}
+analyzeSales(salesToAnalyze = videoGamesSales$Critic_Score, years = yrs, mainTitle ="Mean metacritic ratings by Genre", ylabel = "Ratings")
+
+```
+
+### 5. Resolución del problema. A partir de los resultados obtenidos, ¿cuáles son las conclusiones? ¿Los resultados permiten responder al problema?
+
+#### -	¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito en Europa?
+
+Como podemos observar en los anteriores gráficos, las ventas en videojuegos varían según la región y el género al que pertenecen. 
+Concretamente podemos ver como el género de Shooter seguido del de Sports fueron incrementando su éxito con los años y se han mantenido en posiciones altas. Sin embargo, en el caso de los juegos de plataformas podemos ver cómo en un inicio estaba en tendencia y tenía un número elevado en ventas, pero a partir del 2014 empezó a decaer notablemente. Por lo tanto, actualmente no sería un buen momento para invertir en dicho género.
+En lo que concierne a los juegos de Shooter cabe tener en cuenta que durante el año 2013 las ventas no fueron tan notables. Por el contrario, en 2015 se dispararon y en 2016 pese a que no eran tan altas como el año anterior también destacaban en comparación con el resto de géneros. En cuanto al de deporte, como ya se ha mencionado anteriormente, a medida que pasan los años este va incrementando o manteniendo su éxito y ventas. De manera que podemos decir, que las empresas que apuesten ambos géneros tendrán más probabilidad de éxito en ventas.
+Y finalmente en cuanto al resto de géneros, podemos ver como destacan menos y por lo tanto a su vez tienen menos ganancias.
+
+#### -	¿El género con mayor rating es el que más ventas produce?
+
+En metacritic encontramos dos tipos valoraciones, por un lado, tenemos las que dan los expertos y por otro lado la de los usuarios. Los expertos analizan los videojuegos desde una perspectiva técnica como por ejemplo el sonido, los gráficos, entre otras cosas. Y también su contenido, es decir, el argumento de la historia, la evolución de los personajes a lo largo del argumento, etc. Asimismo, la valoración de los usuarios permite que estos realicen críticas sobre aquellos aspectos que destaquen favorable o negativamente.
+En este caso concretamente podemos observar como los expertos evalúan con la media más alta los videojuegos de Shooter y Sports. Así pues, teniendo en cuenta lo que se mencionó anteriormente sobre los géneros con mayor éxito en ventas podemos ver como coincide que los juegos valorados más positivamente por los expertos son también los más vendidos. 
+Por el contrario, los usuarios valoran con una mayor puntuación los videojuegos de Role Playing Game (RPG) y los de Aventure. De manera que, como se aprecia los mejores valorados por los usuarios no son lo que más ventas producen.
+
+#### Conclusión final:
+
+A modo de conclusión, podemos ver que debido a que las empresas desean arriesgarse menos, siguen produciendo aquellos videojuegos que más ventas generan, en este caso los de Shooter y Sports. 
+En lo que concierne a las valoraciones, se puede observar que, pese a que los usuarios valoran mejor unos juegos, los más vendidos son otros. Lo que demuestra que a los usuarios les parece más confiable las críticas que realizan los expertos. Y por lo tanto, les influencian de tal modo que las tienen en cuenta para realizar sus próximas compras. De manera que, a las empresas les interesara tener mejor críticas por parte de los expertos, siendo algo más indiferente lo que expresen los propios usuarios. No obstante, si no les importa sufrir un mayor riesgo para así satisfacer a los usuarios, deberán fijarse y tener en cuenta las preferencias y criticas de sus clientes.
+
