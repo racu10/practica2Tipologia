@@ -1,8 +1,10 @@
 ---
-title: 'Práctica 2: Limpieza y validación de los datos'
+title: 'PrÃ¡ctica 2: Limpieza y validaciÃ³n de los datos'
 author: "Raul Torne Alonso"
 date: "29 de diciembre de 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 <style>
@@ -21,14 +23,12 @@ El dataset seleccionado contiene información sobre videojuegos. Para obtener dic
 Ahora bien, el motivo principal por el cual cabe tener presente la gran importancia de este dataset, es que puede ser una herramienta fundamental para las empresas desarrolladoras de videojuegos, pues aporta información sobre las tendencias actuales tanto a nivel de plataformas como en géneros. Pues es necesario tener presente, que en cada época se establecen diferentes modas capaces de influenciar todos los ámbitos, y entre ellos el mundo del ocio y los videojuegos. Así pues, estos datos ayudaran a las empresas reconocidas a mantener su estatus de éxito y a las nuevas a prosperar y evolucionar. Puesto que es imprescindible tener en cuenta, que nos encontramos frente a un mercado cada vez más competitivo debido a el número de nuevas empresas que están surgiendo en este sector. Por lo tanto, es necesario que tengan la posibilidad de realizar un análisis mediante estos datos, para así posteriormente crear contenido adaptado a las preferencias de los usuarios.
 
 En lo que concierne a que pregunta o problema pretende responder, considero que todos estos datos nos pueden responder a varias cuestiones. Por un lado, nos pueden mostrar 
-¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito en Europa? Pues como ya se ha mencionado anteriormente, dichos datos proporcionan información relevante respecto a cuál es el contenido que más éxito está teniendo y por lo tanto en cual han de seguir trabajando. Por otro lado, también puede responder a ¿El género con mayor rating es el que más ventas produce? Es decir, si los productos más vendidos son también los más valorados. Pues de este modo, ayudara a las empresas a deducir si las ventas están o no relacionadas con las puntuaciones y críticas de los usuarios. 
+¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito mercado Europeo? Pues como ya se ha mencionado anteriormente, dichos datos proporcionan información relevante respecto a cuál es el contenido que más éxito está teniendo y por lo tanto en cual han de seguir trabajando. Por otro lado, también puede responder a ¿El género con mayor rating es el que más ventas produce? Es decir, si los productos más vendidos son también los más valorados en europa. Pues de este modo, ayudara a las empresas a deducir si las ventas están o no relacionadas con las puntuaciones y críticas de los usuarios. 
 
 
 ```{r}
 videoGamesSales<-read.csv("Video_Game_Sales_as_of_Jan_2017.csv", header=TRUE, sep=",")
 videoGamesSales$Year_of_Release<- as.integer(as.character(videoGamesSales$Year_of_Release))
-
-
 summary(videoGamesSales)
 ```
 
@@ -37,30 +37,60 @@ summary(videoGamesSales)
 #### 2.1 Selección de los datos de interés a analizar. ¿Cuáles son los campos más relevantes para responder al problema?
 
 Los campos más relevantes son "Genre",  "Year_of_Release", "**_Sales", "*_score"
+Como vamos a analizar solo sobre EU eliminamos los datos de las otras regiones.
+
+```{r}
+
+videoGamesSales$NA_Sales <- NULL
+videoGamesSales$JP_Sales <- NULL
+videoGamesSales$Other_Sales <- NULL
+
+summary(videoGamesSales)
+
+
+```
+
 
 #### 2.2 ¿Los datos contienen ceros o elementos vacíos? ¿Y valores extremos? ¿Cómo gestionarías cada uno de estos casos?
 
 Los datos que contienen los scores contienen elementos vacios. Por ello mediante la distancia de Gower predecimos las puntuaciones por similitud de videojuegos permitiendo utilizar todos los datos para nuestra predicción.
 
 ```{r}
+
 require(VIM)
 videoGamesSales <- kNN(videoGamesSales, k = 6)
 summary(videoGamesSales)
+
 ```
 
 
 También tenemos valores extremos en las ventas, ya que siempre hay algún juego que destaca en ventas:
 
 ```{r}
+
 boxplot(videoGamesSales$EU_Sales)
-boxplot(videoGamesSales$NA_Sales)
-boxplot(videoGamesSales$JP_Sales)
+
+```
+
+```{r}
+
+write.csv(videoGamesSales, file = "Video_Game_Sales_as_of_Jan_2017_Clean.csv")
 
 ```
 
 
+
 ### 3. Análisis de los datos.
   - A. Selección de los grupos de datos que se quieren analizar/comparar.
+
+```{r}
+
+videoGamesSales<-read.csv("Video_Game_Sales_as_of_Jan_2017_Clean.csv", header=TRUE, sep=",")
+videoGamesSales$Year_of_Release<- as.integer(as.character(videoGamesSales$Year_of_Release))
+summary(videoGamesSales)
+
+```
+
   
 ```{r}
 allYears <- sort(unique(videoGamesSales$Year_of_Release))
@@ -85,7 +115,28 @@ print(hist(videoGamesSales$User_Score, breaks = 100))
 
   
   - C. Aplicación de pruebas estadísticas (tantas como sea posible) para comparar los grupos de datos.
-  
+
+    - Para comparar la normalidad de las ventas europeas utilizaremos el test de Shapiro, como este admite entre 3 y 5000 datos crearemos un random sample de 5000.
+    
+```{r}
+euSalesSample <- sample(videoGamesSales$EU_Sales, 5000, replace = FALSE, prob = NULL)
+shapiro.test(euSalesSample)
+
+```
+Al ser el p-valor < 0.05 podemos afirmar que la distribución de los datos es normal.
+
+
+    - Para comparar la homogeneidad de la varianza sobre los datos se utilizará el test de levene
+    
+```{r}
+library(car)
+leveneTest(EU_Sales ~ Genre, data=videoGamesSales)
+
+```
+
+Se puede llegar a afirmar que al tener un P-valor < 0.05 es significante la diferencia de varianzas entre el género y las ventas.      
+
+
     - Vamos a comparar si las puntuaciones de metacritic son idénticas según el género con una significancia del 0.05.
 
 ```{r}
@@ -163,14 +214,14 @@ analyzeSales(salesToAnalyze = videoGamesSales$Critic_Score, years = yrs, mainTit
 
 ### 5. Resolución del problema. A partir de los resultados obtenidos, ¿cuáles son las conclusiones? ¿Los resultados permiten responder al problema?
 
-#### -	¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito en Europa?
+#### -	¿En qué genero deberían invertir las empresas para garantizar una mayor probabilidad de éxito en el mercado Europeo?
 
 Como podemos observar en los anteriores gráficos, las ventas en videojuegos varían según la región y el género al que pertenecen. 
 Concretamente podemos ver como el género de Shooter seguido del de Sports fueron incrementando su éxito con los años y se han mantenido en posiciones altas. Sin embargo, en el caso de los juegos de plataformas podemos ver cómo en un inicio estaba en tendencia y tenía un número elevado en ventas, pero a partir del 2014 empezó a decaer notablemente. Por lo tanto, actualmente no sería un buen momento para invertir en dicho género.
 En lo que concierne a los juegos de Shooter cabe tener en cuenta que durante el año 2013 las ventas no fueron tan notables. Por el contrario, en 2015 se dispararon y en 2016 pese a que no eran tan altas como el año anterior también destacaban en comparación con el resto de géneros. En cuanto al de deporte, como ya se ha mencionado anteriormente, a medida que pasan los años este va incrementando o manteniendo su éxito y ventas. De manera que podemos decir, que las empresas que apuesten ambos géneros tendrán más probabilidad de éxito en ventas.
 Y finalmente en cuanto al resto de géneros, podemos ver como destacan menos y por lo tanto a su vez tienen menos ganancias.
 
-#### -	¿El género con mayor rating es el que más ventas produce?
+#### -	¿El género con mayor rating es el que más ventas produce en Europa?
 
 En metacritic encontramos dos tipos valoraciones, por un lado, tenemos las que dan los expertos y por otro lado la de los usuarios. Los expertos analizan los videojuegos desde una perspectiva técnica como por ejemplo el sonido, los gráficos, entre otras cosas. Y también su contenido, es decir, el argumento de la historia, la evolución de los personajes a lo largo del argumento, etc. Asimismo, la valoración de los usuarios permite que estos realicen críticas sobre aquellos aspectos que destaquen favorable o negativamente.
 En este caso concretamente podemos observar como los expertos evalúan con la media más alta los videojuegos de Shooter y Sports. Así pues, teniendo en cuenta lo que se mencionó anteriormente sobre los géneros con mayor éxito en ventas podemos ver como coincide que los juegos valorados más positivamente por los expertos son también los más vendidos. 
